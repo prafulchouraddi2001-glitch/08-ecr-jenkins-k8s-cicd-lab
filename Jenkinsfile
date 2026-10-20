@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { label 'docker-enabled-agent' }
 
     environment {
         IMAGE_NAME = 'project8-cicd-lab'
