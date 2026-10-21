@@ -30,6 +30,17 @@ pipeline {
                 sh 'docker image inspect ${IMAGE_NAME}:${IMAGE_TAG} --format "Image={{.RepoTags}} | Size={{.Size}} bytes"'
             }
         }
+        stage('Export Docker Image') {
+            steps {
+                sh '''
+                    mkdir -p /home/jenkins/agent/project8-handoff
+                    docker image save \
+                        -o /home/jenkins/agent/project8-handoff/${IMAGE_NAME}-${IMAGE_TAG}.tar \
+                        ${IMAGE_NAME}:${IMAGE_TAG}
+                    ls -lh /home/jenkins/agent/project8-handoff/${IMAGE_NAME}-${IMAGE_TAG}.tar
+                '''
+            }
+        }
     }
 
     post {
