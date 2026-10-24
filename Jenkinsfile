@@ -15,6 +15,9 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                stash name: 'kind-deploy-script',
+                      includes: 'scripts/deploy-to-kind.sh',
+                      useDefaultExcludes: false
             }
         }
 
@@ -84,11 +87,36 @@ print(password, end="")
                 }
             }
         }
+        stage('Deploy to Existing kind Cluster') {
+            agent { label 'wsl-kind-deployer' }
+            steps {
+                unstash 'kind-deploy-script'
+                sh '''
+                    set -eu
+                    echo "=== Verify Kubernetes context ==="
+                    test "$(kubectl config current-context)" = "kind-devops-k8s"
+                    test "$(kind get clusters | grep -Fx 'devops-k8s')" = "devops-k8s"
+                    echo "=== Verify Docker image ==="
+                    docker image inspect "$IMAGE_NAME:$IMAGE_TAG"
+
+                    echo "=== Deploy to existing kind cluster ==="
+                    chmod +x scripts/deploy-to-kind.sh
+                    ./scripts/deploy-to-kind.sh "$IMAGE_TAG"
+
+                    echo "=== Final deployment status ==="
+                    kubectl get deployment project8-cicd -n project8-cicd
+
+                    echo "=== Application health check ==="
+                    kubectl exec -n project8-cicd deployment/project8-cicd -- \
+                        python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read().decode())"
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo 'Project 8 CI pipeline and ECR image push completed successfully.'
+            echo 'Project 8 CI, ECR push, and existing kind cluster deployment completed successfully.'
         }
         failure {
             echo 'Project 8 CI pipeline failed. Review the stage logs.'
